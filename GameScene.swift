@@ -49,7 +49,9 @@ struct PhysicsCategory {
 }
 
 class GameScene: SKScene, SKPhysicsContactDelegate {
-    // private var throw_object : SKSpriteNode?
+    
+    private var startPoint  : CGPoint?
+    private var endPoint    : CGPoint?
     
     let player = SKSpriteNode(imageNamed: "player")
     
@@ -101,13 +103,22 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         monster.run(SKAction.sequence([actionMove, actionMoveDone]))
     }
     
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first else {
+            return
+        }
+        
+        startPoint = touch.location(in: self)
+    }
+    
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         // guard is a conditional that forces out of scope
         guard let touch = touches.first else {
             return
         }
         
-        let touchLocation = touch.location(in: self)
+        // let touchLocation = touch.location(in: self)
+        endPoint = touch.location(in: self)
         
         // create projectile
         let projectile = SKSpriteNode(imageNamed: "projectile")
@@ -120,10 +131,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         projectile.physicsBody?.collisionBitMask = PhysicsCategory.None
         projectile.physicsBody?.usesPreciseCollisionDetection = true
         
-        projectile.position = player.position
+        projectile.position = startPoint!
         
-        let offset = touchLocation - projectile.position
-        
+        // let offset = touchLocation - projectile.position
+        print(endPoint! + startPoint!)
+
+        let offset = (endPoint!) - (startPoint!)
+
         if offset.x < 0 { return }
         
         addChild(projectile)
