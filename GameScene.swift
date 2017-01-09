@@ -44,7 +44,7 @@ extension CGPoint {
 struct PhysicsCategory {
     static let None         : UInt32 = 0
     static let All          : UInt32 = UInt32.max
-    static let Monster      : UInt32 = 0b1
+    static let Answer       : UInt32 = 0b1
     static let Projectile   : UInt32 = 0b10
 }
 
@@ -52,23 +52,91 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     private var startPoint  : CGPoint?
     private var endPoint    : CGPoint?
+    private var multilineQues: [SKLabelNode] = []
+    // TODO(kylee): make this multiline ans
+    private var multilineAns: [CustomSpriteNode] = []
+
     
-    let player = SKSpriteNode(imageNamed: "player")
+    var items: [QuestionData] = []
+    
+    var ques = QuestionData(question: "What is the charge on an electron?",
+        answers: ["Negative": true, "Positive": false, "Neutral": false])
+    var flag = false
+    
+    let question = SKLabelNode(fontNamed: "Arial")
     
     override func didMove(to view: SKView) {
+
         backgroundColor = SKColor.white
-        player.position = CGPoint(x: size.width * 0.1, y: size.height * 0.5)
-        addChild(player)
+        
+        addQuestionAndAnswer()
         
         physicsWorld.gravity = CGVector.zero
         physicsWorld.contactDelegate = self
         
-        run(SKAction.repeatForever(
-            SKAction.sequence([
-                SKAction.run(addMonster),
-                SKAction.wait(forDuration: 1.0)
-            ])
-        ))
+    }
+    
+    func addQuestionAndAnswer() {
+        for line in multilineQues {
+            line.removeFromParent()
+        }
+        
+        for a in multilineAns {
+            a.label_answer?.removeFromParent()
+            a.removeFromParent()
+        }
+        
+        multilineQues.removeAll()
+        multilineAns.removeAll()
+        
+        if flag {
+            ques.question = "What is the charge on an electron? What is the charge on an electron? What is the charge on an electron? What is the charge on an electron? What is the charge on an electron?"
+            ques.answers = ["One": false, "Two": false, "Three": true, "Four": false]
+        }
+        
+        _ = addMultilineText(str: ques.question, isQues: true,
+                             numChars: 45, val: size.height/1.2)
+        
+        // Creates the first question in the starting scene
+        
+        
+        // creates initial answers to questions
+        var i = CGFloat(0.5)
+        let width = self.size.width / CGFloat(ques.answers.count)
+        for (ans, correct) in ques.answers {
+            
+            // answer with letters
+            let new_answer = SKLabelNode(fontNamed: "Arial")
+            new_answer.fontName = "Arial"
+            new_answer.text = ans
+            new_answer.fontColor = UIColor.black
+            new_answer.fontSize = 30
+            new_answer.position = CGPoint(x: width * i, y: self.size.height/2.3)
+            
+            // background image behind the words.
+            // TODO(kylee): change imageNamed to plain background
+            let ans_background = CustomSpriteNode(color: .white, size: CGSize(
+                width: width, height: 20))
+            
+            ans_background.label_answer = new_answer
+            ans_background.physicsBody = SKPhysicsBody(rectangleOf: ans_background.size)
+            ans_background.physicsBody?.isDynamic = true
+            ans_background.physicsBody?.categoryBitMask = PhysicsCategory.Answer
+            ans_background.physicsBody?.contactTestBitMask = PhysicsCategory.Projectile
+            ans_background.physicsBody?.collisionBitMask = PhysicsCategory.None
+            ans_background.position = CGPoint(x: width * i, y: self.size.height/2.1)
+            
+            
+            multilineAns.append(ans_background)
+            
+            if correct == true {
+                ans_background.correct_answer = true
+            }
+            
+            i += 1
+            addChild(new_answer)
+            addChild(ans_background)
+        }
     }
     
     func random() -> CGFloat {
@@ -80,11 +148,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     func addMonster() {
-        let monster = SKSpriteNode(imageNamed: "monster")
+        let monster = CustomSpriteNode(imageNamed: "monster")
         
         monster.physicsBody = SKPhysicsBody(rectangleOf: monster.size)
         monster.physicsBody?.isDynamic = true
-        monster.physicsBody?.categoryBitMask = PhysicsCategory.Monster
+        monster.physicsBody?.categoryBitMask = PhysicsCategory.Answer
         monster.physicsBody?.contactTestBitMask = PhysicsCategory.Projectile
         monster.physicsBody?.collisionBitMask = PhysicsCategory.None
 
@@ -107,7 +175,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         guard let touch = touches.first else {
             return
         }
-        
+
         startPoint = touch.location(in: self)
     }
     
@@ -116,6 +184,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         guard let touch = touches.first else {
             return
         }
+        
         
         // let touchLocation = touch.location(in: self)
         endPoint = touch.location(in: self)
@@ -127,7 +196,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         projectile.physicsBody?.isDynamic = true
         projectile.physicsBody?.categoryBitMask = PhysicsCategory.Projectile
-        projectile.physicsBody?.contactTestBitMask = PhysicsCategory.Monster
+        projectile.physicsBody?.contactTestBitMask = PhysicsCategory.Answer
         projectile.physicsBody?.collisionBitMask = PhysicsCategory.None
         projectile.physicsBody?.usesPreciseCollisionDetection = true
         
@@ -135,10 +204,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // let offset = touchLocation - projectile.position
         print(endPoint! + startPoint!)
-
+        
         let offset = (endPoint!) - (startPoint!)
-
-        if offset.x < 0 { return }
         
         addChild(projectile)
         
@@ -154,10 +221,26 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         projectile.run(SKAction.sequence([actionMove, actionMoveDone]))
     }
     
-    func projectileDidCollideWithMoster(projectile: SKSpriteNode, monster: SKSpriteNode) {
-        print("Hit")
+    func projectileDidCollideWithAnswer(answer: CustomSpriteNode, projectile: SKSpriteNode) {
+        if answer.correct_answer {
+            flag = true
+            // change color to green, if answer is right
+            answer.label_answer?.fontColor = UIColor(
+                red: 0.0, green: 0.858, blue: 0.529, alpha: 1.0)
+            // TODO(kylee): call new question here and randomize
+        } else {
+            // change color to red, if answer is right
+            answer.label_answer?.fontColor = UIColor.red
+        }
+        
+        // make answer blink/pulse
+        let actionFadeOut = SKAction.fadeOut(withDuration: 1.0)
+        let actionFadeIn = SKAction.fadeIn(withDuration: 1.0)
+        answer.label_answer?.run(SKAction.sequence([actionFadeOut, actionFadeIn,
+                                                     actionFadeOut, actionFadeIn,
+                                                     SKAction.run(addQuestionAndAnswer)]))
         projectile.removeFromParent()
-        monster.removeFromParent()
+        // answer.removeFromParent()
     }
     
     func didBegin(_ contact: SKPhysicsContact) {
@@ -172,10 +255,59 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             secondBody = contact.bodyA
         }
         
-        if ((firstBody.categoryBitMask & PhysicsCategory.Monster != 0) &&
+        if ((firstBody.categoryBitMask & PhysicsCategory.Answer != 0) &&
             ((secondBody.categoryBitMask & PhysicsCategory.Projectile != 0))) {
-            projectileDidCollideWithMoster(projectile: firstBody.node as! SKSpriteNode,
-                                           monster: secondBody.node as! SKSpriteNode)
+            projectileDidCollideWithAnswer(answer: firstBody.node as! CustomSpriteNode,
+                                           projectile: secondBody.node as! SKSpriteNode)
         }
     }
+    
+    // val is the starting y location for the first line
+    func addMultilineText(str: String, isQues: Bool, numChars: Int, val: CGFloat)-> CGFloat
+    {
+        var Returnval = val
+       
+        // parse through the string and put each words into an array.
+        let separators = NSCharacterSet.whitespacesAndNewlines
+        let words = str.components(separatedBy: separators)
+        let len = str.characters.count
+        let width = numChars; // specify your own width to fit the device screen
+        // get the number of labelnode we need.
+        let numLines = (len/width) + 1
+        var cnt = 0; // used to parse through the words array
+        // here is the for loop that create all the SKLabelNode that we need to
+        // display the string.
+        for i in 0...numLines {
+            var lenPerLine = 0
+            var lineStr = ""
+            while lenPerLine < width {
+                if cnt > words.count - 1 {
+                    break
+                } else {
+                    lineStr = NSString(format: "%@ %@", lineStr, words[cnt]) as String
+                    lenPerLine = lineStr.characters.count
+                    cnt += 1
+                }
+            }
+            // creation of the SKLabelNode itself
+            let multiLineLabel = SKLabelNode(fontNamed: "Light")
+            multiLineLabel.text = lineStr;
+            // name each label node so you can animate it if u wish
+            // the rest of the code should be self-explanatory
+            multiLineLabel.name = NSString(format: "line%d", i) as String
+            multiLineLabel.horizontalAlignmentMode = SKLabelHorizontalAlignmentMode.center
+            multiLineLabel.fontSize = 25;
+            multiLineLabel.fontColor = UIColor.black
+            let top = val-30*CGFloat(i)
+            multiLineLabel.position = CGPoint(x: self.size.width/2 , y: top)
+            // self.sharedInstance.addChildFadeIn(_multiLineLabel, target: self)
+            addChild(multiLineLabel)
+            if isQues {
+                multilineQues.append(multiLineLabel)
+            }
+            Returnval = top;
+        }
+        // return last y pos sp we can add stuff under it  
+        return Returnval  
+    }  
 }
